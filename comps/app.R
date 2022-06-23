@@ -194,11 +194,8 @@ server <- function(session, input, output) {
         
         leafletProxy('leaflet_map', session) %>% 
             clearMarkers() %>% 
-            addMarkers(
-                data=comp_dt(),
-                lng=~lon,
-                lat=~lat
-            )
+            addMarkers(data=input_display_subject(), lng=~lon, lat=~lat, label=~input_address, labelOptions=labelOptions(noHide=T)) %>% 
+            addMarkers(data=comp_dt(), lng=~lon, lat=~lat)
         
     })
     
