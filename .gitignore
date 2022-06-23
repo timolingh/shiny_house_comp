@@ -1,3 +1,9 @@
+# Private data
+data/
+
+# renv
+renv/
+
 # History files
 .Rhistory
 .Rapp.history
@@ -7,6 +13,7 @@
 
 # User-specific files
 .Ruserdata
+.Rprofile
 
 # Example code in package build process
 *-Ex.R
