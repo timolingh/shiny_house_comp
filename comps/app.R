@@ -188,16 +188,40 @@ server <- function(session, input, output) {
                 ]
         })
         
+    
         comp_dt <- reactive({
             selected_comps_rows()
         })
         
-        leafletProxy('leaflet_map', session) %>% 
-            clearMarkers() %>% 
-            addMarkers(data=input_display_subject(), lng=~lon, lat=~lat, label=~input_address, labelOptions=labelOptions(noHide=T)) %>% 
-            addMarkers(data=comp_dt(), lng=~lon, lat=~lat)
+        sel <- reactive({
+            is.null(input$display_comps_data_rows_selected)
+        })
         
-    })
+        ## for debug
+        # cat(file=stderr(), paste0(as.character(sel()), '\n'))
+        ##
+        
+        ## This logic ensures the last row that gets deslected clears the map
+        ## Must have ignoreNULL = F and ignoreInit = T.
+        ## The first flag makes the reactive code respond to NULL
+        ## The second flag delays the activation so you don't load an empty 'input_display_subject()'
+        if (sel()) {
+            leafletProxy('leaflet_map', session) %>%
+                clearMarkers() %>%
+                addMarkers(data=input_display_subject(), lng=~lon, lat=~lat, label=~input_address, labelOptions=labelOptions(noHide=T))
+
+        } else {
+            leafletProxy('leaflet_map', session) %>%
+                clearMarkers() %>%
+                addMarkers(data=input_display_subject(), lng=~lon, lat=~lat, label=~input_address, labelOptions=labelOptions(noHide=T)) %>%
+                addMarkers(
+                    data=comp_dt(), lng=~lon, lat=~lat,
+                    label=~input_address,
+                    labelOptions=labelOptions(noHide=T)
+                )
+        }
+        
+    }, ignoreNULL=F, ignoreInit=T)
     
     output$leaflet_map <- renderLeaflet({
         dt <- data.table(input_raw())
@@ -205,7 +229,6 @@ server <- function(session, input, output) {
         
     })
     
-
     output$raw_data <- renderDT({
         if(is.null(input_raw())) {return()}
         
@@ -213,7 +236,6 @@ server <- function(session, input, output) {
         raw_dt <- input_raw()
 
     })
-    
     
     output$display_subject_data <- renderDT({
         if(is.null(input_display_subject())) {return()}
