@@ -69,13 +69,13 @@ enhance_dataset <- function(dt) {
     dt[, address_key := sapply(Site_Address, digest, algo='sha1')]
     
     # dt[, Sale_Date := as.POSIXct(Sale_Date)]
-    dt[, Sale_Date_2 := ifelse(Category == 'Subject', today(), as.Date(Sale_Date))]
-    dt[, Sale_Price_2 := ifelse(Category == 'Subject', NA, Sale_Price)]
-    dt[, Pr_per_SqFt := ifelse(Category == 'Subject', NA, X._per_SqFt)]
+    # dt[, Sale_Date_2 := ifelse(Category == 'Subject', today(), as.Date(Sale_Date))]
+    # dt[, Sale_Price_2 := ifelse(Category == 'Subject', NA, Sale_Price)]
+    dt[, Pr_per_SqFt := ifelse(Category == 'Subject', NA, Sale_Price / Structure_SqFt)]
     
     # Aggregates
-    dt[, Avg_Pr_per_SqFt := mean(Pr_per_SqFt, na.rm=T)]
-    dt[, Fitted_Price := Structure_SqFt * Avg_Pr_per_SqFt, by=Category]
+    # dt[, Avg_Pr_per_SqFt := mean(Pr_per_SqFt, na.rm=T)]
+    # dt[, Fitted_Price := Structure_SqFt * Avg_Pr_per_SqFt, by=Category]
     
     ## Check if coordinates already exist
     n <- names(dt)
@@ -92,7 +92,7 @@ enhance_dataset <- function(dt) {
         dt_enhanced <- dt_coord[dt, on='address_key']
         
         ## Temp: write out the file so I don't have to keep fetching coords
-        write.csv(dt_enhanced, file=here::here('./tmp_comp.csv'))
+        # write.csv(dt_enhanced, file=here::here('./tmp_comp.csv'))
         
         return(dt_enhanced)
         
@@ -124,6 +124,19 @@ ui <- fluidPage(
             'Import data',
             fluidRow(
                 column(
+                    12,
+                    tags$div(
+                        h3('Input data format'),
+                        p('Prepare a CSV file with the following columns. Refer to the table below for an example:')
+                    ),
+                    tableOutput('column_specification'),
+                    br(),
+                    hr()
+                )
+
+            ),
+            fluidRow(
+                column(
                     8,
                     fileInput('input_file', 'Select the path to the data file in CSV format')
                 )
@@ -134,7 +147,8 @@ ui <- fluidPage(
                     12,
                     tags$div(
                         hr(),
-                        h3('Raw data')
+                        h3('Raw data'),
+                        p('Continue when you see the data below')
                     ),
                     withSpinner(DTOutput('raw_data'))
                 )
@@ -166,7 +180,13 @@ server <- function(session, input, output) {
         
         dt <- data.table(
             read.csv(input_data$datapath)
-        )
+        )[, 1:10]
+        
+        setnames(dt, c(
+            'APN', 'Category', 'Site_Address', 'Property_Type',
+            'Listing_Price', 'Sale_Price', 'Sale_Date', 'Bedrooms',
+            'Bathrooms', 'Structure_SqFt'
+        ))
         
         dt_enhanced <- enhance_dataset(dt)
         
@@ -229,6 +249,23 @@ server <- function(session, input, output) {
         
     })
     
+    output$column_specification <- renderTable({
+        
+        dt <- data.table(
+            APN = c('0000-000-000', '0000-000-001'),
+            Category = c('Subject', 'Comp'),
+            Site_Address = c('100 A Street, Los Angeles, CA 90045', '225 New Street, Los Angeles, CA 90045'),
+            Property_Type = c('SFR', 'SFR'),
+            Sale_Price = c(1000000, 550000),
+            Sale_Date = c('3/5/2022', '12/30/2021'),
+            Bedrooms = c(3, 2),
+            Bathrooms = c(2.5, 3),
+            Structure_SqFt = c(2432, 1700)
+        )
+        
+
+    })
+    
     output$raw_data <- renderDT({
         if(is.null(input_raw())) {return()}
         
@@ -244,7 +281,9 @@ server <- function(session, input, output) {
         dt_out[, .(
             APN, Site_Address, Property_Type, Sale_Price, Sale_Date,
             Bedrooms, Bathrooms, Structure_SqFt, Pr_per_SqFt
-        )]
+        )] %>% 
+            DT::datatable() %>%  
+            formatCurrency(columns=c('Sale_Price', 'Pr_per_SqFt'), digits=0)
 
     })
     
@@ -255,11 +294,12 @@ server <- function(session, input, output) {
         ## but not going to display it in the return value
         dt_out <- input_display_comps()
         
-
         dt_out[,.(
             APN, Site_Address, Property_Type, Sale_Price, Sale_Date,
             Bedrooms, Bathrooms, Structure_SqFt, Pr_per_SqFt
-        )]
+        )] %>% 
+            DT::datatable() %>% 
+            formatCurrency(columns=c('Sale_Price', 'Pr_per_SqFt'), digits=0)
 
     })
     
