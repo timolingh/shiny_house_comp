@@ -250,11 +250,15 @@ server <- function(session, input, output) {
     
     output$display_comps_data <- renderDT({
         if(is.null(input_display_comps())) {return()}
+        
+        ## input_display_comps() has the lat, lon info needed for mapping
+        ## but not going to display it in the return value
         dt_out <- input_display_comps()
         
+
         dt_out[,.(
             APN, Site_Address, Property_Type, Sale_Price, Sale_Date,
-            Bedrooms, Bathrooms, Structure_SqFt, Pr_per_SqFt, lat, lon
+            Bedrooms, Bathrooms, Structure_SqFt, Pr_per_SqFt
         )]
 
     })
