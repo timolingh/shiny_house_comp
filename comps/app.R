@@ -148,7 +148,7 @@ ui <- fluidPage(
                     tags$div(
                         hr(),
                         h3('Raw data'),
-                        p('Continue when you see the data below')
+                        p('Continue to the next tab when you see the data below')
                     ),
                     withSpinner(DTOutput('raw_data'))
                 )
@@ -158,15 +158,19 @@ ui <- fluidPage(
         tabPanel(
             'Comps maps',
             fluidRow(
-                leafletOutput('leaflet_map'),
-                br(),
-                hr(),
-                h4('Subject property'),
-                DTOutput('display_subject_data'),
-                br(),
-                h4('Comps'),
-                DTOutput('display_comps_data')
-            )
+                column(
+                    12,
+                    textOutput('wait_for_data'),
+                    leafletOutput('leaflet_map'),
+                    br(),
+                    hr(),
+                    h4('Subject property'),
+                    DTOutput('display_subject_data'),
+                    br(),
+                    h4('Comps'),
+                    DTOutput('display_comps_data')
+                )
+             )
         )
     )
 )
@@ -198,6 +202,13 @@ server <- function(session, input, output) {
     
     input_display_comps <- reactive({
         dt <- input_raw()[Category == 'Comp']
+    })
+    
+    output$wait_for_data <- renderText({
+        
+        if (!is.null(input_raw())) {return()}
+        paste0('Waiting for data. Please go back to the Import data tab.')
+        
     })
     
     observeEvent(input$display_comps_data_rows_selected, {
@@ -244,6 +255,8 @@ server <- function(session, input, output) {
     }, ignoreNULL=F, ignoreInit=T)
     
     output$leaflet_map <- renderLeaflet({
+        if(is.null(input_raw())) {return()}
+        
         dt <- data.table(input_raw())
         plot_lf(dt)
         
@@ -275,7 +288,8 @@ server <- function(session, input, output) {
     })
     
     output$display_subject_data <- renderDT({
-        if(is.null(input_display_subject())) {return()}
+        # if(is.null(input_display_subject())) {return()}
+        if(is.null(input_raw())) {return()}
         dt_out <- input_display_subject()
         
         dt_out[, .(
@@ -288,7 +302,8 @@ server <- function(session, input, output) {
     })
     
     output$display_comps_data <- renderDT({
-        if(is.null(input_display_comps())) {return()}
+        # if(is.null(input_display_comps())) {return()}
+        if(is.null(input_raw())) {return()}
         
         ## input_display_comps() has the lat, lon info needed for mapping
         ## but not going to display it in the return value
