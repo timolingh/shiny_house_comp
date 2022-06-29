@@ -124,6 +124,19 @@ ui <- fluidPage(
             'Import data',
             fluidRow(
                 column(
+                    12,
+                    tags$div(
+                        h3('Input data format'),
+                        p('Prepare a CSV file with the following columns. Refer to the table below for an example:')
+                    ),
+                    tableOutput('column_specification'),
+                    br(),
+                    hr()
+                )
+
+            ),
+            fluidRow(
+                column(
                     8,
                     fileInput('input_file', 'Select the path to the data file in CSV format')
                 )
@@ -134,7 +147,8 @@ ui <- fluidPage(
                     12,
                     tags$div(
                         hr(),
-                        h3('Raw data')
+                        h3('Raw data'),
+                        p('Continue when you see the data below')
                     ),
                     withSpinner(DTOutput('raw_data'))
                 )
@@ -233,6 +247,23 @@ server <- function(session, input, output) {
         dt <- data.table(input_raw())
         plot_lf(dt)
         
+    })
+    
+    output$column_specification <- renderTable({
+        
+        dt <- data.table(
+            APN = c('0000-000-000', '0000-000-001'),
+            Category = c('Subject', 'Comp'),
+            Site_Address = c('100 A Street, Los Angeles, CA 90045', '225 New Street, Los Angeles, CA 90045'),
+            Property_Type = c('SFR', 'SFR'),
+            Sale_Price = c(1000000, 550000),
+            Sale_Date = c('3/5/2022', '12/30/2021'),
+            Bedrooms = c(3, 2),
+            Bathrooms = c(2.5, 3),
+            Structure_SqFt = c(2432, 1700)
+        )
+        
+
     })
     
     output$raw_data <- renderDT({
