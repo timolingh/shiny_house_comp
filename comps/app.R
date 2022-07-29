@@ -64,6 +64,20 @@ get_coord <- function(address) {
     
 }
 
+get_distance_from_subject <- function(lon, lat, ref_lon, ref_lat) {
+    require(geosphere)
+    d_meters <- distHaversine(
+        c(lon, lat), 
+        c(ref_lon, ref_lat)
+    )
+    
+    d_miles <- d_meters * 0.0006214
+    
+        
+}
+
+vec_get_distance_from_subject <- Vectorize(get_distance_from_subject)
+
 enhance_dataset <- function(dt) {
     
     dt[, address_key := sapply(Site_Address, digest, algo='sha1')]
@@ -94,12 +108,26 @@ enhance_dataset <- function(dt) {
         ## Temp: write out the file so I don't have to keep fetching coords
         # write.csv(dt_enhanced, file=here::here('./tmp_comp.csv'))
         
+        ## Reference coord
+        dt_enhanced[, ref_lon := numeric()]
+        dt_enhanced[, ref_lat := numeric()]
+        
+        if (nrow(dt_enhanced[Category == 'Subject']) > 0) {
+            ref_long <- dt_enhanced[Category == 'Subject', lon][1]
+            ref_lati <- dt_enhanced[Category == 'Subject', lat][1]
+            
+            dt_enhanced[, ref_lon := ref_long]
+            dt_enhanced[, ref_lat := ref_lati]
+        }
+        
+        dt_enhanced[, dist_mi := vec_get_distance_from_subject(lon, lat, ref_lon, ref_lat)]
+        
         return(dt_enhanced)
         
     }
+    
 
 }
-
 
 plot_lf <- function(dt) {
     ctr <- list(
