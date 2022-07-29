@@ -120,7 +120,7 @@ enhance_dataset <- function(dt) {
             dt_enhanced[, ref_lat := ref_lati]
         }
         
-        dt_enhanced[, dist_mi := vec_get_distance_from_subject(lon, lat, ref_lon, ref_lat)]
+        dt_enhanced[, Distance_From_Subject_Miles := vec_get_distance_from_subject(lon, lat, ref_lon, ref_lat)]
         
         return(dt_enhanced)
         
@@ -203,11 +203,20 @@ ui <- fluidPage(
                     br()
                 )
             ),
+            
+            fluidRow(
+                column(12, h4('Filters'))
+            ),
+            
             fluidRow(
                 column(
                     4,
-                    h4('Filters'),
-                    dateRangeInput('sales_date', 'Sales Date', start=(today() - 30), end=NULL),
+                    dateRangeInput('sales_date', 'Sales Date', start=(today() - 30), end=NULL)
+                ),
+                
+                column(
+                    4,
+                    sliderInput('distance_from_subject', 'Distance from Subject (mi)', min=0, max=10, value=5)
                     # verbatimTextOutput('diagnostic')
                 )
             ),
@@ -362,10 +371,11 @@ server <- function(session, input, output) {
         ## input_display_comps() has the lat, lon info needed for mapping
         ## but not going to display it in the return value
         dt_out <- input_display_comps()[as.numeric(as_date(Sale_Date, format='%m/%d/%Y')) %between% c(input$sales_date[1], input$sales_date[2])]
+        dt_out <- dt_out[Distance_From_Subject_Miles <= input$distance_from_subject]
         
         dt_out[,.(
             APN, Site_Address, Property_Type, Sale_Price, Sale_Date,
-            Bedrooms, Bathrooms, Structure_SqFt, Pr_per_SqFt
+            Bedrooms, Bathrooms, Structure_SqFt, Pr_per_SqFt, Distance_From_Subject_Miles
         )] %>% 
             DT::datatable() %>% 
             formatCurrency(columns=c('Sale_Price', 'Pr_per_SqFt'), digits=0)
