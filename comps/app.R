@@ -45,24 +45,38 @@ get_geo_data_from_address <- function(free_address) {
     
 }
 
-get_coord <- function(address) {
-    require(digest)
-    r <- get_geo_data_from_address(address)
-    result <- r[1][[1]]
-    result_obj <- list(
-        input_address=address,
-        address_key=digest(address, algo='sha1'),
-        display_name=ifelse(!is.null(result$display_name), result$display_name, ''),
-        lat=ifelse(!is.na(result$lat), (as.numeric(result$lat)), NA),
-        lon=ifelse(!is.na(result$lon), as.numeric(result$lon), NA)
-        
+# get_coord <- function(address) {
+#     require(digest)
+#     r <- get_geo_data_from_address(address)
+#     result <- r[1][[1]]
+#     result_obj <- list(
+#         input_address=address,
+#         address_key=digest(address, algo='sha1'),
+#         display_name=ifelse(!is.null(result$display_name), result$display_name, ''),
+#         lat=ifelse(!is.na(result$lat), (as.numeric(result$lat)), NA),
+#         lon=ifelse(!is.na(result$lon), as.numeric(result$lon), NA)
+#         
+#     )
+#     
+#     ## Return as a data.table
+#     ## Need to handle empty data here
+#     return(as.data.table(result_obj))
+#     
+# }
+
+get_distance_from_subject <- function(lon, lat, ref_lon, ref_lat) {
+    require(geosphere)
+    d_meters <- distHaversine(
+        c(lon, lat), 
+        c(ref_lon, ref_lat)
     )
     
-    ## Return as a data.table
-    ## Need to handle empty data here
-    return(as.data.table(result_obj))
+    d_miles <- d_meters * 0.0006214
     
+        
 }
+
+vec_get_distance_from_subject <- Vectorize(get_distance_from_subject)
 
 enhance_dataset <- function(dt) {
     
@@ -77,29 +91,39 @@ enhance_dataset <- function(dt) {
     # dt[, Avg_Pr_per_SqFt := mean(Pr_per_SqFt, na.rm=T)]
     # dt[, Fitted_Price := Structure_SqFt * Avg_Pr_per_SqFt, by=Category]
     
+    ## Calculate distance
+    if (nrow(dt[Category == 'Subject']) > 0) {
+        ref_long <- dt[Category == 'Subject', lon][1]
+        ref_lati <- dt[Category == 'Subject', lat][1]
+        
+        dt[, ref_lon := ref_long]
+        dt[, ref_lat := ref_lati]
+    }
+    
+    
+    dt[, Distance_From_Subject_Miles := vec_get_distance_from_subject(lon, lat, ref_lon, ref_lat)]
+    
     ## Check if coordinates already exist
-    n <- names(dt)
-    if (is.element('lon', n) & is.element('lat', n)) {
-        ## Coordinates already exists and we can avoid having to fetch them
-        return(dt)
-        
-    } else {
-
-        dt_coord <- do.call(
-            rbind, lapply(dt[, Site_Address], get_coord)
-        )
-        
-        dt_enhanced <- dt_coord[dt, on='address_key']
+    # n <- names(dt)
+    # if (is.element('lon', n) & is.element('lat', n)) {
+    #     ## Coordinates already exists and we can avoid having to fetch them
+    #     return(dt)
+    #     
+    # } else {
+    # 
+    #     dt_coord <- do.call(
+    #         rbind, lapply(dt[, Site_Address], get_coord)
+    #     )
+    #     
+    #     dt_enhanced <- dt_coord[dt, on='address_key']
         
         ## Temp: write out the file so I don't have to keep fetching coords
         # write.csv(dt_enhanced, file=here::here('./tmp_comp.csv'))
-        
-        return(dt_enhanced)
-        
-    }
+    
+    return(dt)
 
+        
 }
-
 
 plot_lf <- function(dt) {
     ctr <- list(
@@ -110,8 +134,8 @@ plot_lf <- function(dt) {
     m <- leaflet(dt) %>% 
         addTiles() %>% 
         setView(lng=ctr$lon, lat=ctr$lat, zoom=10) %>% 
-        # addMarkers(data=dt[Category == 'Comp'], label=~input_address, labelOptions=labelOptions(noHide=F)) %>% 
-        addMarkers(data=dt[Category == 'Subject'], label=~input_address, labelOptions=labelOptions(noHide=T))
+        # addMarkers(data=dt[Category == 'Comp'], label=~Site_Address, labelOptions=labelOptions(noHide=F)) %>% 
+        addMarkers(data=dt[Category == 'Subject'], label=~Site_Address, labelOptions=labelOptions(noHide=T))
 }
 
 # Define UI
@@ -175,11 +199,20 @@ ui <- fluidPage(
                     br()
                 )
             ),
+            
+            fluidRow(
+                column(12, h4('Filters'))
+            ),
+            
             fluidRow(
                 column(
                     4,
-                    h4('Filters'),
-                    dateRangeInput('sales_date', 'Sales Date', start=(today() - 30), end=NULL),
+                    dateRangeInput('sales_date', 'Sales Date', start=(today() - 30), end=NULL)
+                ),
+                
+                column(
+                    4,
+                    sliderInput('distance_from_subject', 'Distance from Subject (mi)', min=0, max=10, value=5)
                     # verbatimTextOutput('diagnostic')
                 )
             ),
@@ -206,15 +239,16 @@ server <- function(session, input, output) {
         
         dt <- data.table(
             read.csv(input_data$datapath)
-        )[, 1:10]
+        )[, 1:12]
         
         setnames(dt, c(
             'APN', 'Category', 'Site_Address', 'Property_Type',
             'Listing_Price', 'Sale_Price', 'Sale_Date', 'Bedrooms',
-            'Bathrooms', 'Structure_SqFt'
+            'Bathrooms', 'Structure_SqFt', 'lon', 'lat'
         ))
         
         dt_enhanced <- enhance_dataset(dt)
+        
         
     })
     
@@ -265,15 +299,15 @@ server <- function(session, input, output) {
         if (sel()) {
             leafletProxy('leaflet_map', session) %>%
                 clearMarkers() %>%
-                addMarkers(data=input_display_subject(), lng=~lon, lat=~lat, label=~input_address, labelOptions=labelOptions(noHide=T))
+                addMarkers(data=input_display_subject(), lng=~lon, lat=~lat, label=~Site_Address, labelOptions=labelOptions(noHide=T))
 
         } else {
             leafletProxy('leaflet_map', session) %>%
                 clearMarkers() %>%
-                addMarkers(data=input_display_subject(), lng=~lon, lat=~lat, label=~input_address, labelOptions=labelOptions(noHide=T)) %>%
+                addMarkers(data=input_display_subject(), lng=~lon, lat=~lat, label=~Site_Address, labelOptions=labelOptions(noHide=T)) %>%
                 addMarkers(
                     data=comp_dt(), lng=~lon, lat=~lat,
-                    label=~input_address,
+                    label=~Site_Address,
                     labelOptions=labelOptions(noHide=T)
                 )
         }
@@ -333,11 +367,12 @@ server <- function(session, input, output) {
         
         ## input_display_comps() has the lat, lon info needed for mapping
         ## but not going to display it in the return value
-        dt_out <- input_display_comps()[as.numeric(as_date(Sale_Date, format='%m/%d/%Y')) %between% c(input$sales_date[1], input$sales_date[2])]
+        dt_out <- input_display_comps()[as.numeric(as_date(Sale_Date)) %between% c(input$sales_date[1], input$sales_date[2])]
+        dt_out <- dt_out[Distance_From_Subject_Miles <= input$distance_from_subject]
         
         dt_out[,.(
             APN, Site_Address, Property_Type, Sale_Price, Sale_Date,
-            Bedrooms, Bathrooms, Structure_SqFt, Pr_per_SqFt
+            Bedrooms, Bathrooms, Structure_SqFt, Pr_per_SqFt, Distance_From_Subject_Miles
         )] %>% 
             DT::datatable() %>% 
             formatCurrency(columns=c('Sale_Price', 'Pr_per_SqFt'), digits=0)
