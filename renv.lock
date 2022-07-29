@@ -250,6 +250,16 @@
       "Hash": "177475892cf4a55865868527654a7741",
       "Requirements": []
     },
+    "geosphere": {
+      "Package": "geosphere",
+      "Version": "1.5-14",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "1ce6e028f3d056dad1ea9c3c0a5444bf",
+      "Requirements": [
+        "sp"
+      ]
+    },
     "ggplot2": {
       "Package": "ggplot2",
       "Version": "3.3.5",
