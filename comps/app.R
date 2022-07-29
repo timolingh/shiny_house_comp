@@ -23,7 +23,7 @@ get_geo_data_from_address <- function(free_address) {
     require(httr)
     
     # Pause between requests
-    Sys.sleep(3)
+    Sys.sleep(1)
     
     nominatim_url <- "https://nominatim.openstreetmap.org/search/"
     
@@ -135,6 +135,7 @@ ui <- fluidPage(
                 )
 
             ),
+            
             fluidRow(
                 column(
                     8,
@@ -163,14 +164,35 @@ ui <- fluidPage(
                     textOutput('wait_for_data'),
                     leafletOutput('leaflet_map'),
                     br(),
-                    hr(),
+                    hr()
+                )
+            ),
+            fluidRow(
+                column(
+                    12,
                     h4('Subject property'),
                     DTOutput('display_subject_data'),
-                    br(),
-                    h4('Comps'),
+                    br()
+                )
+            ),
+            fluidRow(
+                column(
+                    4,
+                    h4('Filters'),
+                    dateRangeInput('sales_date', 'Sales Date', start=(today() - 30), end=NULL),
+                    # verbatimTextOutput('diagnostic')
+                )
+            ),
+            fluidRow(
+                column(
+                    12,
+                    h4('Comparables'),
                     DTOutput('display_comps_data')
                 )
-             )
+            )
+                    
+            # 
+                    
         )
     )
 )
@@ -210,6 +232,10 @@ server <- function(session, input, output) {
         paste0('Waiting for data. Please go back to the Import data tab.')
         
     })
+    
+    # output$diagnostic <- renderText({
+    #     input_raw()[, as.numeric(min(as.Date(Sale_Date, format='%m/%d/%Y', origin='1970-01-01')))]
+    # })
     
     observeEvent(input$display_comps_data_rows_selected, {
         selected_comps_rows <- eventReactive(
@@ -307,7 +333,7 @@ server <- function(session, input, output) {
         
         ## input_display_comps() has the lat, lon info needed for mapping
         ## but not going to display it in the return value
-        dt_out <- input_display_comps()
+        dt_out <- input_display_comps()[as.numeric(as_date(Sale_Date, format='%m/%d/%Y')) %between% c(input$sales_date[1], input$sales_date[2])]
         
         dt_out[,.(
             APN, Site_Address, Property_Type, Sale_Price, Sale_Date,
